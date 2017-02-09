@@ -30,12 +30,7 @@ writeWorkFile :: String -> IO Handle -> IO (Either IOError ())
 writeWorkFile action hdl = tryIOError $ written >>= write hdl
     where curTime = getCurrentTime >>= return . formatTime defaultTimeLocale "%s"
           written = curTime >>= return . (++) (action ++ " ") >>= return . (++ "\n")
-          write handle string =
-            do handle' <- handle
-               hPutStr handle' string
-               hFlush handle'
-               hClose handle'
---handle >>= (\handle' -> hPutStr handle' string >> hFlush handle' >> hClose handle'
+          write handle string = handle >>= (\handle' -> hPutStr handle' string >> hFlush handle' >> hClose handle')
 
 -- writeWorkFile :: String -> IO (Either IOError ())
 -- writeWorkFile action = tryIOError $ written >>= write
