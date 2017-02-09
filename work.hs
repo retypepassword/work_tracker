@@ -25,12 +25,23 @@ readWorkFile = readFile "workLog"
 
 openWorkFile :: IO Handle
 openWorkFile = openFile "workLog" AppendMode
-
+ 
 writeWorkFile :: String -> IO Handle -> IO (Either IOError ())
 writeWorkFile action hdl = tryIOError $ written >>= write hdl
     where curTime = getCurrentTime >>= return . formatTime defaultTimeLocale "%s"
           written = curTime >>= return . (++) (action ++ " ") >>= return . (++ "\n")
-          write handle string = handle >>= (\handle' -> hPutStr handle' string)
+          write handle string =
+            do handle' <- handle
+               hPutStr handle' string
+               hFlush handle'
+               hClose handle'
+--handle >>= (\handle' -> hPutStr handle' string >> hFlush handle' >> hClose handle'
+
+-- writeWorkFile :: String -> IO (Either IOError ())
+-- writeWorkFile action = tryIOError $ written >>= write
+--     where curTime = getCurrentTime >>= return . formatTime defaultTimeLocale "%s"
+--           written = curTime >>= return . (++) (action ++ " ") >>= return . (++ "\n")
+--           write string = appendFile "workLog" string
 
 sumSecsToMin :: Double -> Double
 sumSecsToMin = (/ 60)
@@ -44,9 +55,9 @@ getDay day = (liftM (formatTime defaultTimeLocale "%j") $ parsedLocalTime) >>= d
 getSecs :: String -> UTCTime
 getSecs day = parseTimeOrError False defaultTimeLocale "%s" day
 
-tellSuccess :: Bool -> String
-tellSuccess True = "Success!"
-tellSuccess False = "That didn't work."
+tellSuccess :: (Either IOError ()) -> String
+tellSuccess (Right ()) = "Success!"
+tellSuccess (Left err) = "Error: " ++ (show $ ioeGetErrorType err)
 
 splitStringFor2 :: (a -> [String] -> a) -> a -> String -> a
 splitStringFor2 f tup str = f tup (words str)
@@ -69,8 +80,8 @@ justToday ["start", time] = getDay time >>= isToday
 justToday [_, _] = return False
 
 work :: [String] -> IO String
-work ["start"] = liftM tellSuccess $ liftM isRight $ writeWorkFile "start" openWorkFile
-work ["stop"] = liftM tellSuccess $ liftM isRight $ writeWorkFile "stop" openWorkFile
+work ["start"] = liftM tellSuccess $ writeWorkFile "start" openWorkFile
+work ["stop"] = liftM tellSuccess $ writeWorkFile "stop" openWorkFile
 work ["total", "today"] = readWorkFile
     >>= filterM (splitStringFor1 justToday) . lines >>= return . showTotal
 work ["total"] = readWorkFile >>= return . showTotal . lines
