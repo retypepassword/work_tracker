@@ -23,20 +23,11 @@ type TotalTime = Int
 readWorkFile :: IO String
 readWorkFile = readFile "workLog"
 
-openWorkFile :: IO Handle
-openWorkFile = openFile "workLog" AppendMode
- 
-writeWorkFile :: String -> IO Handle -> IO (Either IOError ())
-writeWorkFile action hdl = tryIOError $ written >>= write hdl
+writeWorkFile :: String -> IO (Either IOError ())
+writeWorkFile action = tryIOError $ written >>= write
     where curTime = getCurrentTime >>= return . formatTime defaultTimeLocale "%s"
           written = curTime >>= return . (++) (action ++ " ") >>= return . (++ "\n")
-          write handle string = handle >>= (\handle' -> hPutStr handle' string >> hFlush handle' >> hClose handle')
-
--- writeWorkFile :: String -> IO (Either IOError ())
--- writeWorkFile action = tryIOError $ written >>= write
---     where curTime = getCurrentTime >>= return . formatTime defaultTimeLocale "%s"
---           written = curTime >>= return . (++) (action ++ " ") >>= return . (++ "\n")
---           write string = appendFile "workLog" string
+          write string = appendFile "workLog" string
 
 sumSecsToMin :: Double -> Double
 sumSecsToMin = (/ 60)
@@ -75,8 +66,8 @@ justToday ["start", time] = getDay time >>= isToday
 justToday [_, _] = return False
 
 work :: [String] -> IO String
-work ["start"] = liftM tellSuccess $ writeWorkFile "start" openWorkFile
-work ["stop"] = liftM tellSuccess $ writeWorkFile "stop" openWorkFile
+work ["start"] = liftM tellSuccess $ writeWorkFile "start"
+work ["stop"] = liftM tellSuccess $ writeWorkFile "stop"
 work ["total", "today"] = readWorkFile
     >>= filterM (splitStringFor1 justToday) . lines >>= return . showTotal
 work ["total"] = readWorkFile >>= return . showTotal . lines
