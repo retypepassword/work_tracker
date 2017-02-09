@@ -9,7 +9,7 @@ import Data.Time.Format
 import Data.Time.LocalTime
 import Control.Monad
 
-main = getArgs >>= work
+main = getArgs >>= work >>= putStr . (++ "\n")
 
 data Status = Start | Stop deriving Show
 convertStatus Start = True
@@ -29,10 +29,8 @@ openWorkFile = openFile "workLog" AppendMode
 writeWorkFile :: String -> IO Handle -> IO (Either IOError ())
 writeWorkFile action hdl = tryIOError $ written >>= write hdl
     where curTime = getCurrentTime >>= return . formatTime defaultTimeLocale "%s"
-          written = curTime >>= return . (++) (action ++ " ")
+          written = curTime >>= return . (++) (action ++ " ") >>= return . (++ "\n")
           write handle string = handle >>= (\handle' -> hPutStr handle' string)
-
--- getSecs :: String -> String -> Int
 
 sumSecsToMin :: Double -> Double
 sumSecsToMin = (/ 60)
@@ -50,18 +48,20 @@ tellSuccess :: Bool -> String
 tellSuccess True = "Success!"
 tellSuccess False = "That didn't work."
 
-splitStringFor2 :: ([String] -> a -> a) -> String -> a -> a
-splitStringFor2 f str tup = f (words str) tup
+splitStringFor2 :: (a -> [String] -> a) -> a -> String -> a
+splitStringFor2 f tup str = f tup (words str)
 
 splitStringFor1 :: ([String] -> a) -> String -> a
 splitStringFor1 f str = f (words str)
 
-sumTimes :: [String] -> (TotalTime, StartTime, Status) -> (TotalTime, StartTime, Status)
-sumTimes [status, time] (total, _, Start) = (total, (read time) :: Int, convertToStatus status)
-sumTimes [status, time] (total, start, Stop) = (total + ((read time) :: Int) - start, 0, convertToStatus status)
+sumTimes :: (TotalTime, StartTime, Status) -> [String] -> (TotalTime, StartTime, Status)
+-- If the previous action was stop, then this one is probably start
+sumTimes (total, _, Stop) [status, time] = (total, (read time) :: Int, convertToStatus status)
+-- Vice versa
+sumTimes (total, start, Start) [status, time] = (total + ((read time) :: Int) - start, 0, convertToStatus status)
 
 showTotal :: [String] -> String
-showTotal = show . (\(x, _, _) -> x) . (foldr (splitStringFor2 sumTimes) (0, 0, Stop))
+showTotal = show . (\(x, _, _) -> x) . (foldl (splitStringFor2 sumTimes) (0, 0, Stop))
 
 justToday :: [String] -> IO Bool
 justToday ["start", time] = getDay time >>= isToday
@@ -74,3 +74,8 @@ work ["stop"] = liftM tellSuccess $ liftM isRight $ writeWorkFile "stop" openWor
 work ["total", "today"] = readWorkFile
     >>= filterM (splitStringFor1 justToday) . lines >>= return . showTotal
 work ["total"] = readWorkFile >>= return . showTotal . lines
+work _ = return $ "Usage:\n" ++
+    "Run... work start:       to indicate that you've started working\n" ++
+    "       work stop:        to indicate that you've stopped working\n" ++
+    "       work total today: to figure out how much time you've worked today\n" ++
+    "       work total:       to figure out how much time you've worked overall"
