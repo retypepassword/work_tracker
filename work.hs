@@ -61,9 +61,8 @@ showTotal :: [String] -> String
 showTotal = show . (\(x, _, _) -> x) . (foldl (splitStringFor2 sumTimes) (0, 0, Stop))
 
 justToday :: [String] -> IO Bool
-justToday ["start", time] = getDay time >>= isToday
+justToday [_, time] = getDay time >>= isToday
     where isToday day = getCurrentTime >>= return . formatTime defaultTimeLocale "%s" >>= getDay >>= return . (== day)
-justToday [_, _] = return False
 
 work :: [String] -> IO String
 work ["start"] = liftM tellSuccess $ writeWorkFile "start"
