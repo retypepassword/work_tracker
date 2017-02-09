@@ -21,13 +21,13 @@ type StartTime = Int
 type TotalTime = Int
 
 readWorkFile :: IO String
-readWorkFile = readFile "workLog"
+readWorkFile = readFile "work_log"
 
 writeWorkFile :: String -> IO (Either IOError ())
 writeWorkFile action = tryIOError $ written >>= write
     where curTime = getCurrentTime >>= return . formatTime defaultTimeLocale "%s"
           written = curTime >>= return . (++) (action ++ " ") >>= return . (++ "\n")
-          write string = appendFile "workLog" string
+          write string = appendFile "work_log" string
 
 sumSecsToMin :: Double -> Double
 sumSecsToMin = (/ 60)
