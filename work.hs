@@ -3,7 +3,8 @@ import System.Exit
 import System.IO
 import System.IO.Error
 import Data.Either
-import GHC.IO.Handle
+import Data.List
+import Data.Function
 import Data.Time.Clock
 import Data.Time.Format
 import Data.Time.LocalTime
@@ -29,8 +30,11 @@ writeWorkFile action = tryIOError $ written >>= write
           written = curTime >>= return . (++) (action ++ " ") >>= return . (++ "\n")
           write string = appendFile "work_log" string
 
-sumSecsToMin :: Double -> Double
-sumSecsToMin = (/ 60)
+divBy60 :: Int -> Int
+divBy60 = floor . (/ 60) . fromIntegral
+
+toHrMin :: Int -> String
+toHrMin = concat . concat . transpose . (flip (++) [[" hr, ", " min"]]) . (: []) . map show . uncurry ((++) `on` (: [])) . (`quotRem` 60) . divBy60
 
 getDay :: String -> IO Int
 getDay day = (liftM (formatTime defaultTimeLocale "%j") $ parsedLocalTime) >>= dayToInt
@@ -58,7 +62,7 @@ sumTimes (total, _, Stop) [status, time] = (total, (read time) :: Int, convertTo
 sumTimes (total, start, Start) [status, time] = (total + ((read time) :: Int) - start, 0, convertToStatus status)
 
 showTotal :: [String] -> String
-showTotal = show . (\(x, _, _) -> x) . (foldl (splitStringFor2 sumTimes) (0, 0, Stop))
+showTotal = toHrMin . (\(x, _, _) -> x) . (foldl (splitStringFor2 sumTimes) (0, 0, Stop))
 
 justToday :: [String] -> IO Bool
 justToday [_, time] = getDay time >>= isToday
