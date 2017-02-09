@@ -9,13 +9,17 @@ import Data.Time.Format
 import Data.Time.LocalTime
 import Control.Monad
 
--- main = getArgs >>= putStr . work
+main = getArgs >>= work
 
--- readWorkFile :: IO Handle -> IO String
--- readWorkFile hdl = inEOF >>= testRead
---     where inEOF = hdl >>= hIsEOF
---           readWorkLine = hdl >>= hGetLine
---           testRead in_eof = if in_eof then return "" else readWorkLine
+data Status = Start | Stop deriving Show
+convertStatus Start = True
+convertStatus Stop = False
+convertToStatus "start" = Start
+convertToStatus "stop" = Stop
+
+type StartTime = Int
+type TotalTime = Int
+
 readWorkFile :: IO String
 readWorkFile = readFile "workLog"
 
@@ -39,16 +43,34 @@ getDay day = (liftM (formatTime defaultTimeLocale "%j") $ parsedLocalTime) >>= d
           parsedLocalTime = getCurrentTimeZone >>= return . localTime 
           dayToInt = return . read
 
+getSecs :: String -> UTCTime
+getSecs day = parseTimeOrError False defaultTimeLocale "%s" day
 
 tellSuccess :: Bool -> String
 tellSuccess True = "Success!"
 tellSuccess False = "That didn't work."
 
+splitStringFor2 :: ([String] -> a -> a) -> String -> a -> a
+splitStringFor2 f str tup = f (words str) tup
+
+splitStringFor1 :: ([String] -> a) -> String -> a
+splitStringFor1 f str = f (words str)
+
+sumTimes :: [String] -> (TotalTime, StartTime, Status) -> (TotalTime, StartTime, Status)
+sumTimes [status, time] (total, _, Start) = (total, (read time) :: Int, convertToStatus status)
+sumTimes [status, time] (total, start, Stop) = (total + ((read time) :: Int) - start, 0, convertToStatus status)
+
+showTotal :: [String] -> String
+showTotal = show . (\(x, _, _) -> x) . (foldr (splitStringFor2 sumTimes) (0, 0, Stop))
+
+justToday :: [String] -> IO Bool
+justToday ["start", time] = getDay time >>= isToday
+    where isToday day = getCurrentTime >>= return . formatTime defaultTimeLocale "%s" >>= getDay >>= return . (== day)
+justToday [_, _] = return False
+
 work :: [String] -> IO String
 work ["start"] = liftM tellSuccess $ liftM isRight $ writeWorkFile "start" openWorkFile
 work ["stop"] = liftM tellSuccess $ liftM isRight $ writeWorkFile "stop" openWorkFile
--- work ["total", "today"] = 
--- work ["total"] =
-
-exit = exitWith ExitSuccess
-die  = exitWith (ExitFailure 1)
+work ["total", "today"] = readWorkFile
+    >>= filterM (splitStringFor1 justToday) . lines >>= return . showTotal
+work ["total"] = readWorkFile >>= return . showTotal . lines
