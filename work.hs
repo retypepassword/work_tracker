@@ -43,17 +43,17 @@ getDay day = (liftM (formatTime defaultTimeLocale "%j") $ parsedLocalTime) >>= d
           dayToInt = return . read
 
 getSecs :: String -> UTCTime
-getSecs day = parseTimeOrError False defaultTimeLocale "%s" day
+getSecs = parseTimeOrError False defaultTimeLocale "%s"
 
 tellSuccess :: (Either IOError ()) -> String
 tellSuccess (Right ()) = "Success!"
 tellSuccess (Left err) = "Error: " ++ (show $ ioeGetErrorType err)
 
 splitStringFor2 :: (a -> [String] -> a) -> a -> String -> a
-splitStringFor2 f tup str = f tup (words str)
+splitStringFor2 = flip . splitStringFor . flip
 
-splitStringFor1 :: ([String] -> a) -> String -> a
-splitStringFor1 f str = f (words str)
+splitStringFor :: ([String] -> a) -> String -> a
+splitStringFor f str = f (words str)
 
 sumTimes :: (TotalTime, StartTime, Status) -> [String] -> (TotalTime, StartTime, Status)
 -- If the previous action was stop, then this one is probably start
@@ -72,7 +72,7 @@ work :: [String] -> IO String
 work ["start"] = liftM tellSuccess $ writeWorkFile "start"
 work ["stop"] = liftM tellSuccess $ writeWorkFile "stop"
 work ["total", "today"] = readWorkFile
-    >>= filterM (splitStringFor1 justToday) . lines >>= return . showTotal
+    >>= filterM (splitStringFor justToday) . lines >>= return . showTotal
 work ["total"] = readWorkFile >>= return . showTotal . lines
 work _ = return $ "Usage:\n" ++
     "Run... work start:       to indicate that you've started working\n" ++
